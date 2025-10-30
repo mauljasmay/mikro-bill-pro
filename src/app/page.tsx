@@ -7,6 +7,7 @@ import {
   Package, Globe, Shield, Zap, Server, UserPlus, BarChart3, Settings,
   Smartphone, Laptop, Gamepad2, Tv, Loader2, AlertCircle, Check
 } from 'lucide-react'
+import { ThemeToggle, ThemeToggleMobile } from '@/components/ThemeToggle'
 
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -307,9 +308,9 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       {/* Navigation */}
-      <nav className="fixed top-0 w-full bg-white/90 backdrop-blur-md shadow-sm z-50">
+      <nav className="fixed top-0 w-full bg-white/90 dark:bg-gray-900/90 backdrop-blur-md shadow-sm z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
@@ -330,7 +331,7 @@ export default function Home() {
                     className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                       activeSection === item
                         ? 'bg-blue-600 text-white'
-                        : 'text-gray-700 hover:bg-gray-100'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                     }`}
                   >
                     {item.charAt(0).toUpperCase() + item.slice(1)}
@@ -340,6 +341,9 @@ export default function Home() {
             </div>
             
             <div className="flex items-center gap-4">
+              <div className="hidden md:block">
+                <ThemeToggle />
+              </div>
               <button 
                 onClick={handleLogin}
                 className="hidden md:block px-4 py-2 text-blue-600 hover:text-blue-700 font-medium transition-colors"
@@ -352,10 +356,11 @@ export default function Home() {
               >
                 Sign Up
               </button>
-              <div className="md:hidden">
+              <div className="md:hidden flex items-center gap-2">
+                <ThemeToggleMobile />
                 <button
                   onClick={() => setIsMenuOpen(!isMenuOpen)}
-                  className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:bg-gray-100"
+                  className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
                   {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
                 </button>
@@ -366,13 +371,13 @@ export default function Home() {
         
         {/* Mobile menu */}
         {isMenuOpen && (
-          <div className="md:hidden bg-white border-t">
+          <div className="md:hidden bg-white dark:bg-gray-900 border-t dark:border-gray-700">
             <div className="px-2 pt-2 pb-3 space-y-1">
               {['home', 'packages', 'features', 'about', 'contact'].map((item) => (
                 <button
                   key={item}
                   onClick={() => scrollToSection(item)}
-                  className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
+                  className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
                   {item.charAt(0).toUpperCase() + item.slice(1)}
                 </button>
@@ -384,39 +389,39 @@ export default function Home() {
 
       {/* Hero Section */}
       <section id="home" className="pt-16 min-h-screen flex items-center relative">
-        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-5" 
+        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-5 dark:opacity-10" 
              style={{ backgroundImage: 'url(/hero-bg.jpg)' }} />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative z-10">
           <div className="text-center">
             <div className="flex justify-center mb-6">
-              <div className="p-4 bg-blue-100 rounded-full">
-                <Router className="w-16 h-16 text-blue-600" />
+              <div className="p-4 bg-blue-100 dark:bg-blue-900 rounded-full">
+                <Router className="w-16 h-16 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-6">
               Mikrotik Billing &
               <span className="block bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 Management System
               </span>
             </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+            <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto px-4">
               Complete PPPoE and Hotspot billing solution with Mikrotik RouterOS integration, 
               Xendit payment gateway, and real-time monitoring.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center px-4">
               <button 
                 onClick={() => scrollToSection('packages')}
-                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+                className="px-6 sm:px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200 text-sm sm:text-base"
               >
                 View Packages
-                <Package className="inline-block ml-2 w-5 h-5" />
+                <Package className="inline-block ml-2 w-4 h-4 sm:w-5 sm:h-5" />
               </button>
               <button 
                 onClick={() => scrollToSection('contact')}
-                className="px-8 py-3 bg-white text-gray-700 rounded-lg font-semibold border border-gray-300 hover:bg-gray-50 transition-colors"
+                className="px-6 sm:px-8 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-semibold border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm sm:text-base"
               >
                 Free Demo
-                <ArrowRight className="inline-block ml-2 w-5 h-5" />
+                <ArrowRight className="inline-block ml-2 w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
           </div>
@@ -426,13 +431,13 @@ export default function Home() {
       {/* Stats Section */}
       <section className="py-20 bg-gradient-to-r from-blue-600 to-purple-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8 text-center">
             {stats.map((stat, index) => (
-              <div key={index} className="text-white">
-                <div className="text-4xl md:text-5xl font-bold mb-2">
+              <div key={index} className="text-white p-4">
+                <div className="text-3xl sm:text-4xl md:text-5xl font-bold mb-2">
                   {stat.number}
                 </div>
-                <div className="text-blue-100">
+                <div className="text-sm sm:text-base text-blue-100">
                   {stat.label}
                 </div>
               </div>
@@ -453,56 +458,56 @@ export default function Home() {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {packages.map((pkg, index) => (
               <div key={index} className={`relative bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 ${
                 pkg.popular ? 'ring-2 ring-purple-500 transform scale-105' : ''
               }`}>
                 {pkg.popular && (
-                  <div className="absolute top-0 right-0 bg-purple-500 text-white px-4 py-1 rounded-bl-lg text-sm font-semibold">
+                  <div className="absolute top-0 right-0 bg-purple-500 text-white px-3 py-1 rounded-bl-lg text-xs sm:text-sm font-semibold z-10">
                     Most Popular
                   </div>
                 )}
                 
-                <div className={`p-6 bg-gradient-to-br ${pkg.color} text-white`}>
+                <div className={`p-4 sm:p-6 bg-gradient-to-br ${pkg.color} text-white`}>
                   <div className="flex items-center justify-between mb-4">
-                    <div className="p-3 bg-white/20 rounded-lg">
+                    <div className="p-2 sm:p-3 bg-white/20 rounded-lg">
                       {pkg.icon}
                     </div>
-                    <span className="px-3 py-1 bg-white/20 rounded-full text-sm">
+                    <span className="px-2 py-1 sm:px-3 sm:py-1 bg-white/20 rounded-full text-xs sm:text-sm">
                       {pkg.type}
                     </span>
                   </div>
-                  <h3 className="text-2xl font-bold mb-2">{pkg.name}</h3>
+                  <h3 className="text-xl sm:text-2xl font-bold mb-2">{pkg.name}</h3>
                   <div className="flex items-baseline mb-4">
-                    <span className="text-4xl font-bold">Rp {pkg.price.toLocaleString('id-ID')}</span>
-                    <span className="ml-2 text-white/80">/{pkg.duration} days</span>
+                    <span className="text-3xl sm:text-4xl font-bold">Rp {(Number(pkg.price) || 0).toLocaleString('id-ID')}</span>
+                    <span className="ml-2 text-sm sm:text-base text-white/80">/{pkg.duration} days</span>
                   </div>
-                  <div className="text-sm text-white/90">
+                  <div className="text-xs sm:text-sm text-white/90">
                     {pkg.speedLimit} • {pkg.dataLimit ? `${pkg.dataLimit}GB` : 'Unlimited'}
                   </div>
                 </div>
                 
-                <div className="p-6">
-                  <ul className="space-y-3 mb-6">
+                <div className="p-4 sm:p-6">
+                  <ul className="space-y-2 sm:space-y-3 mb-6">
                     {pkg.features.map((feature, idx) => (
                       <li key={idx} className="flex items-center gap-2">
-                        <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                        <span className="text-gray-700">{feature}</span>
+                        <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 flex-shrink-0" />
+                        <span className="text-sm sm:text-base text-gray-700">{feature}</span>
                       </li>
                     ))}
                   </ul>
                   
                   <button 
                     onClick={() => handlePackageSelect(pkg)}
-                    className={`w-full py-3 rounded-lg font-semibold transition-all duration-200 ${
+                    className={`w-full py-3 rounded-lg font-semibold transition-all duration-200 text-sm sm:text-base ${
                       pkg.popular 
                         ? 'bg-purple-600 text-white hover:bg-purple-700' 
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
                     Select Package
-                    <ArrowRight className="inline-block ml-2 w-5 h-5" />
+                    <ArrowRight className="inline-block ml-2 w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                 </div>
               </div>
@@ -862,7 +867,7 @@ export default function Home() {
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Total Amount:</span>
                   <span className="text-2xl font-bold text-gray-900">
-                    Rp {selectedPackage.price.toLocaleString('id-ID')}
+                    Rp {(Number(selectedPackage.price) || 0).toLocaleString('id-ID')}
                   </span>
                 </div>
               </div>
