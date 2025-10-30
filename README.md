@@ -49,24 +49,28 @@ Complete PPPoE and Hotspot billing solution with Mikrotik RouterOS integration, 
 
 3. **Setup environment variables**
    ```bash
-   cp .env.local.example .env.local
+   cp .env.example .env.local
    ```
    
-   Edit `.env.local` with your configuration:
+   Edit `.env.local` with your configuration. See [.env.example](.env.example) for all available variables:
    ```env
    # Database
    DATABASE_URL="file:./dev.db"
    
+   # NextAuth.js
+   NEXTAUTH_URL="http://localhost:3000"
+   NEXTAUTH_SECRET="your-secret-key-here"
+   
    # Xendit Payment Gateway
-   XENDIT_API_KEY="xnd_development_YourSecretKeyHere"
-   XENDIT_CALLBACK_TOKEN="YourCallbackTokenHere"
-   NEXT_PUBLIC_BASE_URL="http://localhost:3000"
+   XENDIT_SECRET_KEY="xnd_development_your-secret-key-here"
+   XENDIT_API_KEY="xnd_development_your-api-key-here"
+   XENDIT_WEBHOOK_TOKEN="your-webhook-token-here"
    
    # Mikrotik Configuration
-   MIKROTIK_HOST="192.168.1.1"
-   MIKROTIK_PORT="8728"
+   MIKROTIK_HOST="192.168.88.1"
    MIKROTIK_USERNAME="admin"
-   MIKROTIK_PASSWORD="password"
+   MIKROTIK_PASSWORD="your-password"
+   MIKROTIK_PORT="8728"
    MIKROTIK_USE_SSL="false"
    ```
 
