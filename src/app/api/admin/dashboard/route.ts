@@ -66,6 +66,38 @@ export async function GET(request: NextRequest) {
       mikrotikStatus = 'error'
     }
 
+    // Get current month revenue
+    const currentMonth = new Date()
+    currentMonth.setDate(1) // First day of current month
+    const nextMonth = new Date(currentMonth)
+    nextMonth.setMonth(nextMonth.getMonth() + 1)
+    
+    const revenueThisMonth = await db.transaction.aggregate({
+      where: {
+        status: 'SUCCESS',
+        createdAt: {
+          gte: currentMonth,
+          lt: nextMonth
+        }
+      },
+      _sum: { amount: true }
+    })
+
+    // Get new users today
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    
+    const newUsersToday = await db.user.count({
+      where: {
+        createdAt: {
+          gte: today,
+          lt: tomorrow
+        }
+      }
+    })
+
     const stats = {
       totalUsers,
       activeUsers,
@@ -73,7 +105,9 @@ export async function GET(request: NextRequest) {
       activeSubscriptions,
       expiredSubscriptions,
       systemUptime: mikrotikStatus === 'connected' ? '99.9%' : '0%',
-      mikrotikStatus
+      mikrotikStatus,
+      revenueThisMonth: revenueThisMonth._sum.amount || 0,
+      newUsersToday
     }
 
     return NextResponse.json({

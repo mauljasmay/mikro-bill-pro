@@ -62,14 +62,43 @@ export class MikrotikAPI {
           'Content-Type': 'application/json',
         },
         body: data ? JSON.stringify(data) : undefined,
+        // Add timeout to prevent hanging
+        signal: AbortSignal.timeout(10000) // 10 second timeout
       })
 
       if (!response.ok) {
-        throw new Error(`Mikrotik API error: ${response.status} ${response.statusText}`)
+        // Handle different HTTP status codes
+        if (response.status === 401) {
+          throw new Error('Authentication failed - invalid credentials')
+        } else if (response.status === 403) {
+          throw new Error('Access forbidden - insufficient permissions')
+        } else if (response.status === 404) {
+          throw new Error('API endpoint not found - check Mikrotik version')
+        } else {
+          throw new Error(`Mikrotik API error: ${response.status} ${response.statusText}`)
+        }
+      }
+
+      // Check if response is actually JSON
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Invalid response from Mikrotik - not JSON format')
       }
 
       return await response.json()
     } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Connection timeout - Mikrotik device not responding')
+      }
+      
+      if (error.message.includes('ECONNREFUSED')) {
+        throw new Error('Connection refused - check host and port')
+      }
+      
+      if (error.message.includes('ENOTFOUND')) {
+        throw new Error('Host not found - check hostname/IP address')
+      }
+      
       console.error('Mikrotik API request failed:', error)
       throw error
     }
