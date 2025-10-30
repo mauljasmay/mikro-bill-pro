@@ -5,7 +5,7 @@ import {
   Menu, X, ChevronRight, Wifi, Router, CreditCard, Users, Activity, 
   ArrowRight, Mail, Phone, MapPin, CheckCircle, Star, Clock, Award,
   Package, Globe, Shield, Zap, Server, UserPlus, BarChart3, Settings,
-  Smartphone, Laptop, Gamepad2, Tv
+  Smartphone, Laptop, Gamepad2, Tv, Loader2, AlertCircle, Check
 } from 'lucide-react'
 
 export default function Home() {
@@ -13,6 +13,15 @@ export default function Home() {
   const [activeSection, setActiveSection] = useState('home')
   const [selectedPackage, setSelectedPackage] = useState(null)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [notification, setNotification] = useState({ show: false, message: '', type: 'success' })
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    company: '',
+    message: ''
+  })
+  const [formErrors, setFormErrors] = useState({})
 
   useEffect(() => {
     const handleScroll = () => {
@@ -209,6 +218,94 @@ export default function Home() {
     setShowPaymentModal(true)
   }
 
+  const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
+    setNotification({ show: true, message, type })
+    setTimeout(() => {
+      setNotification({ show: false, message: '', type: 'success' })
+    }, 3000)
+  }
+
+  const validateForm = () => {
+    const errors = {}
+    if (!formData.fullName.trim()) errors.fullName = 'Full name is required'
+    if (!formData.email.trim()) errors.email = 'Email is required'
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) errors.email = 'Email is invalid'
+    if (!formData.company.trim()) errors.company = 'Company is required'
+    if (!formData.message.trim()) errors.message = 'Message is required'
+    return errors
+  }
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const errors = validateForm()
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors)
+      return
+    }
+    
+    setIsLoading(true)
+    setFormErrors({})
+    
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+      
+      if (response.ok) {
+        showNotification('Demo request submitted successfully! We will contact you soon.', 'success')
+        setFormData({ fullName: '', email: '', company: '', message: '' })
+      } else {
+        showNotification('Failed to submit request. Please try again.', 'error')
+      }
+    } catch (error) {
+      showNotification('Network error. Please try again.', 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handlePayment = async (paymentMethod: string) => {
+    if (!selectedPackage) return
+    
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/subscriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          packageId: selectedPackage.id,
+          paymentMethod,
+          customerInfo: {
+            name: formData.fullName || 'Guest User',
+            email: formData.email || 'guest@example.com'
+          }
+        })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        showNotification(`Payment initiated! ${data.message || 'Please complete your payment.'}`, 'success')
+        setShowPaymentModal(false)
+      } else {
+        showNotification('Failed to initiate payment. Please try again.', 'error')
+      }
+    } catch (error) {
+      showNotification('Network error. Please try again.', 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleLogin = () => {
+    window.location.href = '/admin'
+  }
+
+  const handleSignUp = () => {
+    showNotification('Sign up feature coming soon!', 'info')
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Navigation */}
@@ -243,10 +340,16 @@ export default function Home() {
             </div>
             
             <div className="flex items-center gap-4">
-              <button className="hidden md:block px-4 py-2 text-blue-600 hover:text-blue-700 font-medium">
+              <button 
+                onClick={handleLogin}
+                className="hidden md:block px-4 py-2 text-blue-600 hover:text-blue-700 font-medium transition-colors"
+              >
                 Login
               </button>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+              <button 
+                onClick={handleSignUp}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
                 Sign Up
               </button>
               <div className="md:hidden">
@@ -512,16 +615,23 @@ export default function Home() {
                 Request Free Demo
               </h3>
               
-              <form className="space-y-6">
+              <form onSubmit={handleContactSubmit} className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Full Name
                   </label>
                   <input
                     type="text"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={formData.fullName}
+                    onChange={(e) => setFormData({...formData, fullName: e.target.value})}
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      formErrors.fullName ? 'border-red-500' : 'border-gray-300'
+                    }`}
                     placeholder="Your full name"
                   />
+                  {formErrors.fullName && (
+                    <p className="mt-1 text-sm text-red-600">{formErrors.fullName}</p>
+                  )}
                 </div>
                 
                 <div>
@@ -530,9 +640,16 @@ export default function Home() {
                   </label>
                   <input
                     type="email"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      formErrors.email ? 'border-red-500' : 'border-gray-300'
+                    }`}
                     placeholder="your@email.com"
                   />
+                  {formErrors.email && (
+                    <p className="mt-1 text-sm text-red-600">{formErrors.email}</p>
+                  )}
                 </div>
                 
                 <div>
@@ -541,9 +658,16 @@ export default function Home() {
                   </label>
                   <input
                     type="text"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={formData.company}
+                    onChange={(e) => setFormData({...formData, company: e.target.value})}
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      formErrors.company ? 'border-red-500' : 'border-gray-300'
+                    }`}
                     placeholder="Your company name"
                   />
+                  {formErrors.company && (
+                    <p className="mt-1 text-sm text-red-600">{formErrors.company}</p>
+                  )}
                 </div>
                 
                 <div>
@@ -552,17 +676,34 @@ export default function Home() {
                   </label>
                   <textarea
                     rows={4}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={formData.message}
+                    onChange={(e) => setFormData({...formData, message: e.target.value})}
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      formErrors.message ? 'border-red-500' : 'border-gray-300'
+                    }`}
                     placeholder="Tell us about your requirements..."
                   />
+                  {formErrors.message && (
+                    <p className="mt-1 text-sm text-red-600">{formErrors.message}</p>
+                  )}
                 </div>
                 
                 <button
                   type="submit"
-                  className="w-full px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+                  disabled={isLoading}
+                  className="w-full px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
-                  Request Demo
-                  <ArrowRight className="inline-block ml-2 w-5 h-5" />
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="inline-block mr-2 w-5 h-5 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      Request Demo
+                      <ArrowRight className="inline-block ml-2 w-5 h-5" />
+                    </>
+                  )}
                 </button>
               </form>
             </div>
@@ -674,6 +815,24 @@ export default function Home() {
         </div>
       </footer>
 
+      {/* Notification Toast */}
+      {notification.show && (
+        <div className={`fixed top-20 right-4 z-50 p-4 rounded-lg shadow-lg flex items-center gap-3 max-w-sm animate-pulse ${
+          notification.type === 'success' ? 'bg-green-500 text-white' :
+          notification.type === 'error' ? 'bg-red-500 text-white' :
+          'bg-blue-500 text-white'
+        }`}>
+          {notification.type === 'success' ? (
+            <Check className="w-5 h-5" />
+          ) : notification.type === 'error' ? (
+            <AlertCircle className="w-5 h-5" />
+          ) : (
+            <AlertCircle className="w-5 h-5" />
+          )}
+          <span>{notification.message}</span>
+        </div>
+      )}
+
       {/* Payment Modal */}
       {showPaymentModal && selectedPackage && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -710,14 +869,47 @@ export default function Home() {
             </div>
             
             <div className="space-y-3">
-              <button className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-                Pay with Virtual Account
+              <button 
+                onClick={() => handlePayment('VIRTUAL_ACCOUNT')}
+                disabled={isLoading}
+                className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="inline-block mr-2 w-5 h-5 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  'Pay with Virtual Account'
+                )}
               </button>
-              <button className="w-full py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors">
-                Pay with E-Wallet
+              <button 
+                onClick={() => handlePayment('EWALLET')}
+                disabled={isLoading}
+                className="w-full py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="inline-block mr-2 w-5 h-5 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  'Pay with E-Wallet'
+                )}
               </button>
-              <button className="w-full py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors">
-                Pay with QRIS
+              <button 
+                onClick={() => handlePayment('QRIS')}
+                disabled={isLoading}
+                className="w-full py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="inline-block mr-2 w-5 h-5 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  'Pay with QRIS'
+                )}
               </button>
             </div>
           </div>

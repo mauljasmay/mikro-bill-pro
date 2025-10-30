@@ -4,18 +4,28 @@ import { useState, useEffect } from 'react'
 import { 
   Router, Settings, Users, Package, CreditCard, Activity, BarChart3,
   Plus, Edit, Trash2, Eye, Power, PowerOff, RefreshCw, CheckCircle, XCircle,
-  Server, Wifi, Globe, Shield, AlertCircle, TrendingUp, Download, Upload
+  Server, Wifi, Globe, Shield, AlertCircle, TrendingUp, Download, Upload,
+  Loader2, Search, Filter, ChevronDown, UserPlus, DollarSign, Clock
 } from 'lucide-react'
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [mikrotikConfig, setMikrotikConfig] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [notification, setNotification] = useState({ show: false, message: '', type: 'success' })
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterStatus, setFilterStatus] = useState('all')
+  const [users, setUsers] = useState([])
+  const [transactions, setTransactions] = useState([])
+  const [packages, setPackages] = useState([])
+  const [mikrotikUsers, setMikrotikUsers] = useState([])
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
     totalRevenue: 0,
-    systemUptime: '0%'
+    systemUptime: '0%',
+    newUsersToday: 0,
+    revenueThisMonth: 0
   })
 
   const menuItems = [
@@ -30,12 +40,29 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchDashboardData()
+    fetchUsers()
+    fetchTransactions()
+    fetchPackages()
+    fetchMikrotikUsers()
+    
+    // Set up real-time updates
+    const interval = setInterval(() => {
+      fetchDashboardData()
+      fetchMikrotikUsers()
+    }, 30000) // Update every 30 seconds
+    
+    return () => clearInterval(interval)
   }, [])
 
+  const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
+    setNotification({ show: true, message, type })
+    setTimeout(() => {
+      setNotification({ show: false, message: '', type: 'success' })
+    }, 3000)
+  }
+
   const fetchDashboardData = async () => {
-    setIsLoading(true)
     try {
-      // Fetch dashboard stats
       const response = await fetch('/api/admin/dashboard')
       if (response.ok) {
         const data = await response.json()
@@ -43,8 +70,54 @@ export default function AdminDashboard() {
       }
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error)
-    } finally {
-      setIsLoading(false)
+    }
+  }
+
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('/api/admin/users')
+      if (response.ok) {
+        const data = await response.json()
+        setUsers(data.users || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch users:', error)
+    }
+  }
+
+  const fetchTransactions = async () => {
+    try {
+      const response = await fetch('/api/admin/transactions')
+      if (response.ok) {
+        const data = await response.json()
+        setTransactions(data.transactions || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch transactions:', error)
+    }
+  }
+
+  const fetchPackages = async () => {
+    try {
+      const response = await fetch('/api/packages')
+      if (response.ok) {
+        const data = await response.json()
+        setPackages(data.packages || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch packages:', error)
+    }
+  }
+
+  const fetchMikrotikUsers = async () => {
+    try {
+      const response = await fetch('/api/mikrotik/users')
+      if (response.ok) {
+        const data = await response.json()
+        setMikrotikUsers(data.users || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch Mikrotik users:', error)
     }
   }
 
@@ -59,12 +132,33 @@ export default function AdminDashboard() {
       
       const data = await response.json()
       if (data.success) {
-        alert('Connection successful!')
+        showNotification('Connection successful!', 'success')
       } else {
-        alert('Connection failed: ' + data.message)
+        showNotification('Connection failed: ' + data.message, 'error')
       }
     } catch (error) {
-      alert('Connection test failed: ' + error.message)
+      showNotification('Connection test failed: ' + error.message, 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleUserAction = async (userId: string, action: string) => {
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/${action}`, {
+        method: 'POST'
+      })
+      
+      if (response.ok) {
+        showNotification(`User ${action} successful!`, 'success')
+        fetchUsers()
+        fetchMikrotikUsers()
+      } else {
+        showNotification(`Failed to ${action} user`, 'error')
+      }
+    } catch (error) {
+      showNotification(`Action failed: ${error.message}`, 'error')
     } finally {
       setIsLoading(false)
     }
@@ -73,40 +167,58 @@ export default function AdminDashboard() {
   const renderDashboard = () => (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-lg">
+        <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-blue-100 rounded-lg">
               <Users className="w-6 h-6 text-blue-600" />
             </div>
-            <span className="text-sm text-green-600 font-medium">+12%</span>
+            <span className="text-sm text-green-600 font-medium flex items-center gap-1">
+              <TrendingUp className="w-4 h-4" />
+              +12%
+            </span>
           </div>
           <h3 className="text-2xl font-bold text-gray-900">{stats.totalUsers}</h3>
           <p className="text-gray-600">Total Users</p>
+          <div className="mt-2 text-sm text-gray-500">
+            +{stats.newUsersToday} new today
+          </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-lg">
+        <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-green-100 rounded-lg">
               <Activity className="w-6 h-6 text-green-600" />
             </div>
-            <span className="text-sm text-green-600 font-medium">+8%</span>
+            <span className="text-sm text-green-600 font-medium flex items-center gap-1">
+              <TrendingUp className="w-4 h-4" />
+              +8%
+            </span>
           </div>
           <h3 className="text-2xl font-bold text-gray-900">{stats.activeUsers}</h3>
           <p className="text-gray-600">Active Users</p>
+          <div className="mt-2 text-sm text-gray-500">
+            Online now
+          </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-lg">
+        <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-purple-100 rounded-lg">
-              <CreditCard className="w-6 h-6 text-purple-600" />
+              <DollarSign className="w-6 h-6 text-purple-600" />
             </div>
-            <span className="text-sm text-green-600 font-medium">+25%</span>
+            <span className="text-sm text-green-600 font-medium flex items-center gap-1">
+              <TrendingUp className="w-4 h-4" />
+              +25%
+            </span>
           </div>
           <h3 className="text-2xl font-bold text-gray-900">Rp {stats.totalRevenue.toLocaleString('id-ID')}</h3>
           <p className="text-gray-600">Total Revenue</p>
+          <div className="mt-2 text-sm text-gray-500">
+            Rp {stats.revenueThisMonth.toLocaleString('id-ID')} this month
+          </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-lg">
+        <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-orange-100 rounded-lg">
               <Server className="w-6 h-6 text-orange-600" />
@@ -115,35 +227,65 @@ export default function AdminDashboard() {
           </div>
           <h3 className="text-2xl font-bold text-gray-900">{stats.systemUptime}</h3>
           <p className="text-gray-600">System Uptime</p>
+          <div className="mt-2 text-sm text-gray-500">
+            All systems operational
+          </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-xl shadow-lg">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Transactions</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Recent Transactions</h3>
+            <button 
+              onClick={fetchTransactions}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
           <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
+            {transactions.length > 0 ? (
+              transactions.slice(0, 5).map((transaction: any, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      transaction.status === 'SUCCESS' ? 'bg-green-100' : 'bg-yellow-100'
+                    }`}>
+                      {transaction.status === 'SUCCESS' ? (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      ) : (
+                        <Clock className="w-5 h-5 text-yellow-600" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{transaction.customerName || 'User'}</p>
+                      <p className="text-sm text-gray-600">{transaction.packageName || 'Package'}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900">User #{1000 + i}</p>
-                    <p className="text-sm text-gray-600">Home Package</p>
+                  <div className="text-right">
+                    <p className="font-semibold text-gray-900">Rp {transaction.amount?.toLocaleString('id-ID') || '0'}</p>
+                    <p className="text-sm text-gray-600">{new Date(transaction.createdAt).toLocaleTimeString()}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold text-gray-900">Rp 100.000</p>
-                  <p className="text-sm text-gray-600">2 min ago</p>
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <CreditCard className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                <p>No transactions yet</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-lg">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">System Status</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">System Status</h3>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-sm text-green-600">Live</span>
+            </div>
+          </div>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -173,6 +315,41 @@ export default function AdminDashboard() {
               </div>
               <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">Valid</span>
             </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Activity className="w-5 h-5 text-red-600" />
+                <span className="text-gray-700">API Response</span>
+              </div>
+              <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">45ms</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bandwidth Usage Chart */}
+      <div className="bg-white p-6 rounded-xl shadow-lg">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Network Overview</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="text-center">
+            <div className="flex items-center justify-center mb-2">
+              <Upload className="w-8 h-8 text-blue-600 mr-2" />
+              <span className="text-2xl font-bold text-gray-900">2.4 Gbps</span>
+            </div>
+            <p className="text-gray-600">Total Upload</p>
+          </div>
+          <div className="text-center">
+            <div className="flex items-center justify-center mb-2">
+              <Download className="w-8 h-8 text-green-600 mr-2" />
+              <span className="text-2xl font-bold text-gray-900">8.7 Gbps</span>
+            </div>
+            <p className="text-gray-600">Total Download</p>
+          </div>
+          <div className="text-center">
+            <div className="flex items-center justify-center mb-2">
+              <Users className="w-8 h-8 text-purple-600 mr-2" />
+              <span className="text-2xl font-bold text-gray-900">{mikrotikUsers.length}</span>
+            </div>
+            <p className="text-gray-600">Connected Devices</p>
           </div>
         </div>
       </div>
@@ -315,6 +492,24 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Notification Toast */}
+      {notification.show && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg flex items-center gap-3 max-w-sm animate-pulse ${
+          notification.type === 'success' ? 'bg-green-500 text-white' :
+          notification.type === 'error' ? 'bg-red-500 text-white' :
+          'bg-blue-500 text-white'
+        }`}>
+          {notification.type === 'success' ? (
+            <CheckCircle className="w-5 h-5" />
+          ) : notification.type === 'error' ? (
+            <AlertCircle className="w-5 h-5" />
+          ) : (
+            <AlertCircle className="w-5 h-5" />
+          )}
+          <span>{notification.message}</span>
+        </div>
+      )}
+
       <div className="flex">
         {/* Sidebar */}
         <div className="w-64 bg-white shadow-lg min-h-screen">
