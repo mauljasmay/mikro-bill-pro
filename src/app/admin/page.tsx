@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { 
   Router, Settings, Users, Package, CreditCard, Activity, BarChart3,
   Plus, Edit, Trash2, Eye, Power, PowerOff, RefreshCw, CheckCircle, XCircle,
   Server, Wifi, Globe, Shield, AlertCircle, TrendingUp, Download, Upload,
   Loader2, Search, Filter, ChevronDown, UserPlus, DollarSign, Clock,
-  Menu, X
+  Menu, X, CreditCard as PaymentIcon, LogOut, User
 } from 'lucide-react'
 import ErrorBoundary, { useErrorHandler } from '@/components/ErrorBoundary'
 import LoadingFallback, { SkeletonCard, SkeletonTable } from '@/components/LoadingFallback'
@@ -14,14 +15,25 @@ import NetworkErrorFallback, { ApiErrorFallback } from '@/components/NetworkErro
 import { ThemeToggle, ThemeToggleMobile } from '@/components/ThemeToggle'
 
 export default function AdminDashboard() {
+  const router = useRouter()
+  // Authentication disabled - direct access to dashboard
+  const [user] = useState({ 
+    id: 'admin', 
+    email: 'admin@mikrobill.pro', 
+    name: 'Administrator', 
+    role: 'ADMIN' 
+  })
+  const logout = () => {
+    // Logout disabled - no action needed
+  }
   const [activeTab, setActiveTab] = useState('dashboard')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [mikrotikConfig, setMikrotikConfig] = useState({
     host: '',
-    port: 8728,
+    port: 8729, // Default SSL port
     username: '',
     password: '',
-    useSSL: false
+    useSSL: true // SSL enabled by default for public connections
   })
   const [isLoading, setIsLoading] = useState(false)
   const [isInitialLoading, setIsInitialLoading] = useState(true)
@@ -34,6 +46,20 @@ export default function AdminDashboard() {
   const [transactions, setTransactions] = useState([])
   const [packages, setPackages] = useState([])
   const [mikrotikUsers, setMikrotikUsers] = useState([])
+  const [xenditConfig, setXenditConfig] = useState({
+    name: '',
+    secretKey: '',
+    publicKey: '',
+    webhookToken: '',
+    environment: 'production',
+    enableVA: true,
+    enableEwallet: true,
+    enableRetail: false,
+    enableQris: true,
+    vaTypes: 'bca,bni,bri,mandiri,cimb',
+    ewalletTypes: 'gopay,ovo,shopeepay,dana',
+    expiryMinutes: 60
+  })
   const [fetchErrors, setFetchErrors] = useState<{ [key: string]: Error | null }>({})
   const { handleError } = useErrorHandler()
   
@@ -52,6 +78,7 @@ export default function AdminDashboard() {
     { id: 'packages', label: 'Packages', icon: <Package className="w-5 h-5" /> },
     { id: 'mikrotik', label: 'Mikrotik', icon: <Router className="w-5 h-5" /> },
     { id: 'transactions', label: 'Transactions', icon: <CreditCard className="w-5 h-5" /> },
+    { id: 'xendit', label: 'Xendit', icon: <PaymentIcon className="w-5 h-5" /> },
     { id: 'monitoring', label: 'Monitoring', icon: <Activity className="w-5 h-5" /> },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> }
   ]
@@ -67,7 +94,9 @@ export default function AdminDashboard() {
           fetchUsers(),
           fetchTransactions(),
           fetchPackages(),
-          fetchMikrotikUsers()
+          fetchMikrotikUsers(),
+          fetchXenditConfig(),
+          fetchMikrotikConfig()
         ])
       } catch (error) {
         console.error('Failed to load initial data:', error)
@@ -179,6 +208,102 @@ export default function AdminDashboard() {
     }
   }
 
+  const fetchXenditConfig = async () => {
+    try {
+      const response = await fetch('/api/admin/xendit')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.data) {
+          setXenditConfig({
+            name: data.data.name || '',
+            secretKey: data.data.secretKey || '',
+            publicKey: data.data.publicKey || '',
+            webhookToken: data.data.webhookToken || '',
+            environment: data.data.environment || 'production',
+            enableVA: data.data.enableVA ?? true,
+            enableEwallet: data.data.enableEwallet ?? true,
+            enableRetail: data.data.enableRetail ?? false,
+            enableQris: data.data.enableQris ?? true,
+            vaTypes: data.data.vaTypes || 'bca,bni,bri,mandiri,cimb',
+            ewalletTypes: data.data.ewalletTypes || 'gopay,ovo,shopeepay,dana',
+            expiryMinutes: data.data.expiryMinutes || 60
+          })
+        }
+        setFetchErrors(prev => ({ ...prev, xendit: null }))
+      } else {
+        throw new Error(`Failed to fetch Xendit config: ${response.status}`)
+      }
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error('Unknown error')
+      setFetchErrors(prev => ({ ...prev, xendit: err }))
+      console.error('Failed to fetch Xendit config:', err)
+    }
+  }
+
+  const fetchMikrotikConfig = async () => {
+    try {
+      const response = await fetch('/api/admin/mikrotik')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.configs && data.configs.length > 0) {
+          const activeConfig = data.configs.find(config => config.isActive) || data.configs[0]
+          setMikrotikConfig({
+            host: activeConfig.host || '',
+            port: parseInt(activeConfig.port) || 8728,
+            username: activeConfig.username || '',
+            password: activeConfig.password || '',
+            useSSL: activeConfig.useSSL || false
+          })
+        }
+        setFetchErrors(prev => ({ ...prev, mikrotikConfig: null }))
+      } else {
+        throw new Error(`Failed to fetch Mikrotik config: ${response.status}`)
+      }
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error('Unknown error')
+      setFetchErrors(prev => ({ ...prev, mikrotikConfig: err }))
+      console.error('Failed to fetch Mikrotik config:', err)
+    }
+  }
+
+  const saveMikrotikConfig = async () => {
+    setIsLoading(true)
+    try {
+      // Validate required fields
+      if (!mikrotikConfig?.host || !mikrotikConfig?.username || !mikrotikConfig?.password) {
+        showNotification('Please fill in all required fields (Host, Username, Password)', 'error')
+        return
+      }
+
+      const response = await fetch('/api/admin/mikrotik', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Default Mikrotik',
+          host: mikrotikConfig.host,
+          port: mikrotikConfig.port || 8728,
+          username: mikrotikConfig.username,
+          password: mikrotikConfig.password,
+          useSSL: mikrotikConfig.useSSL || false
+        })
+      })
+      
+      const data = await response.json()
+      if (data.success) {
+        showNotification('Mikrotik configuration saved successfully!', 'success')
+        fetchMikrotikConfig()
+      } else {
+        showNotification('Failed to save configuration: ' + (data.error || data.message || 'Unknown error'), 'error')
+      }
+    } catch (error) {
+      console.error('Save Mikrotik config error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      showNotification('Failed to save configuration: ' + errorMessage, 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
     setNotification({ show: true, message, type })
     setTimeout(() => {
@@ -226,6 +351,85 @@ export default function AdminDashboard() {
       }
       
       showNotification(errorMessage, 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const testXenditConnection = async () => {
+    setIsLoading(true)
+    try {
+      // Validate config first
+      if (!xenditConfig?.secretKey || !xenditConfig?.publicKey) {
+        showNotification('Please fill in Secret Key and Public Key', 'error')
+        return
+      }
+
+      const response = await fetch('/api/admin/xendit/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          secretKey: xenditConfig.secretKey,
+          publicKey: xenditConfig.publicKey,
+          environment: xenditConfig.environment
+        })
+      })
+      
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Server returned invalid response format')
+      }
+      
+      const data = await response.json()
+      if (data.success) {
+        showNotification(`Xendit connection successful! Environment: ${data.data.environment}, Balance: ${data.data.balance} ${data.data.currency}`, 'success')
+      } else {
+        showNotification('Xendit connection failed: ' + data.message, 'error')
+      }
+    } catch (error) {
+      console.error('Xendit connection test error:', error)
+      let errorMessage = 'Connection test failed'
+      
+      if (error.message.includes('Failed to fetch')) {
+        errorMessage = 'Network error - check your connection'
+      } else if (error.message.includes('JSON')) {
+        errorMessage = 'Server error - please try again later'
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      showNotification(errorMessage, 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const saveXenditConfig = async () => {
+    setIsLoading(true)
+    try {
+      // Validate required fields
+      if (!xenditConfig?.name || !xenditConfig?.secretKey || !xenditConfig?.publicKey) {
+        showNotification('Please fill in all required fields (Name, Secret Key, Public Key)', 'error')
+        return
+      }
+
+      const response = await fetch('/api/admin/xendit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(xenditConfig)
+      })
+      
+      const data = await response.json()
+      if (data.success) {
+        showNotification('Xendit configuration saved successfully!', 'success')
+        fetchXenditConfig()
+      } else {
+        showNotification('Failed to save configuration: ' + data.message, 'error')
+      }
+    } catch (error) {
+      console.error('Save Xendit config error:', error)
+      showNotification('Failed to save configuration: ' + error.message, 'error')
     } finally {
       setIsLoading(false)
     }
@@ -571,6 +775,205 @@ export default function AdminDashboard() {
     </div>
   )
 
+  const renderXenditConfig = () => (
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-xl shadow-lg">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Xendit Payment Configuration</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Configuration Name</label>
+            <input
+              type="text"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Production Xendit"
+              value={xenditConfig?.name || ''}
+              onChange={(e) => setXenditConfig({...xenditConfig, name: e.target.value})}
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Environment</label>
+            <select
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={xenditConfig?.environment || 'production'}
+              onChange={(e) => setXenditConfig({...xenditConfig, environment: e.target.value})}
+            >
+              <option value="production">Production</option>
+              <option value="sandbox">Sandbox</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Secret Key</label>
+            <input
+              type="password"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="xnd_production_..."
+              value={xenditConfig?.secretKey || ''}
+              onChange={(e) => setXenditConfig({...xenditConfig, secretKey: e.target.value})}
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Public Key</label>
+            <input
+              type="password"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="xnd_public_..."
+              value={xenditConfig?.publicKey || ''}
+              onChange={(e) => setXenditConfig({...xenditConfig, publicKey: e.target.value})}
+            />
+          </div>
+          
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Webhook Token (Optional)</label>
+            <input
+              type="password"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="webhook_token_..."
+              value={xenditConfig?.webhookToken || ''}
+              onChange={(e) => setXenditConfig({...xenditConfig, webhookToken: e.target.value})}
+            />
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <h4 className="text-md font-medium text-gray-900 mb-4">Payment Methods</h4>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                checked={xenditConfig?.enableVA || false}
+                onChange={(e) => setXenditConfig({...xenditConfig, enableVA: e.target.checked})}
+              />
+              <span className="text-gray-700">Virtual Account</span>
+            </label>
+            
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                checked={xenditConfig?.enableEwallet || false}
+                onChange={(e) => setXenditConfig({...xenditConfig, enableEwallet: e.target.checked})}
+              />
+              <span className="text-gray-700">E-Wallet</span>
+            </label>
+            
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                checked={xenditConfig?.enableRetail || false}
+                onChange={(e) => setXenditConfig({...xenditConfig, enableRetail: e.target.checked})}
+              />
+              <span className="text-gray-700">Retail</span>
+            </label>
+            
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                checked={xenditConfig?.enableQris || false}
+                onChange={(e) => setXenditConfig({...xenditConfig, enableQris: e.target.checked})}
+              />
+              <span className="text-gray-700">QRIS</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">VA Types (comma separated)</label>
+            <input
+              type="text"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="bca,bni,bri,mandiri,cimb"
+              value={xenditConfig?.vaTypes || ''}
+              onChange={(e) => setXenditConfig({...xenditConfig, vaTypes: e.target.value})}
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">E-Wallet Types (comma separated)</label>
+            <input
+              type="text"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="gopay,ovo,shopeepay,dana"
+              value={xenditConfig?.ewalletTypes || ''}
+              onChange={(e) => setXenditConfig({...xenditConfig, ewalletTypes: e.target.value})}
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Expiry (minutes)</label>
+            <input
+              type="number"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="60"
+              value={xenditConfig?.expiryMinutes || 60}
+              onChange={(e) => setXenditConfig({...xenditConfig, expiryMinutes: parseInt(e.target.value) || 60})}
+            />
+          </div>
+        </div>
+
+        <div className="mt-8 flex gap-4">
+          <button
+            onClick={testXenditConnection}
+            disabled={isLoading}
+            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+          >
+            {isLoading ? (
+              <RefreshCw className="w-5 h-5 animate-spin" />
+            ) : (
+              'Test Connection'
+            )}
+          </button>
+          
+          <button
+            onClick={saveXenditConfig}
+            disabled={isLoading}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            {isLoading ? (
+              <RefreshCw className="w-5 h-5 animate-spin" />
+            ) : (
+              'Save Configuration'
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-xl shadow-lg">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Xendit Integration Guide</h3>
+        
+        <div className="space-y-4 text-sm text-gray-600">
+          <div>
+            <h4 className="font-medium text-gray-900 mb-2">1. Get API Keys</h4>
+            <p>Login to your Xendit dashboard and navigate to Settings &gt; API Keys to get your Secret Key and Public Key.</p>
+          </div>
+          
+          <div>
+            <h4 className="font-medium text-gray-900 mb-2">2. Configure Webhook</h4>
+            <p>Set up webhook URL in your Xendit dashboard to: <code className="bg-gray-100 px-2 py-1 rounded">https://yourdomain.com/api/xendit/webhook</code></p>
+          </div>
+          
+          <div>
+            <h4 className="font-medium text-gray-900 mb-2">3. Test Connection</h4>
+            <p>Use the "Test Connection" button to verify your API keys are working correctly.</p>
+          </div>
+          
+          <div>
+            <h4 className="font-medium text-gray-900 mb-2">4. Payment Methods</h4>
+            <p>Enable the payment methods you want to support. Virtual Accounts and E-Wallets are most popular.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
   const renderDashboard = () => {
     if (isInitialLoading) {
       return (
@@ -798,24 +1201,24 @@ export default function AdminDashboard() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Host/IP Address</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Host/IP Address atau Hostname</label>
             <input
               type="text"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="192.168.1.1"
+              placeholder="mikrotik.domain.com atau 192.168.1.1"
               value={mikrotikConfig?.host || ''}
               onChange={(e) => setMikrotikConfig({...mikrotikConfig, host: e.target.value})}
             />
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Port</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Port API</label>
             <input
               type="number"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="8728"
+              placeholder="8729 (SSL) atau 8728 (HTTP)"
               value={mikrotikConfig?.port || ''}
-              onChange={(e) => setMikrotikConfig({...mikrotikConfig, port: e.target.value})}
+              onChange={(e) => setMikrotikConfig({...mikrotikConfig, port: parseInt(e.target.value) || 8729})}
             />
           </div>
           
@@ -850,13 +1253,13 @@ export default function AdminDashboard() {
               checked={mikrotikConfig?.useSSL || false}
               onChange={(e) => setMikrotikConfig({...mikrotikConfig, useSSL: e.target.checked})}
             />
-            <span className="text-gray-700">Use SSL/TLS</span>
+            <span className="text-gray-700">Gunakan SSL/TLS (Disarankan untuk IP Public)</span>
           </label>
           
           <button
             onClick={testMikrotikConnection}
             disabled={isLoading}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
           >
             {isLoading ? (
               <RefreshCw className="w-5 h-5 animate-spin" />
@@ -864,6 +1267,60 @@ export default function AdminDashboard() {
               'Test Connection'
             )}
           </button>
+          
+          <button
+            onClick={saveMikrotikConfig}
+            disabled={isLoading}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            {isLoading ? (
+              <RefreshCw className="w-5 h-5 animate-spin" />
+            ) : (
+              'Save Configuration'
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-xl shadow-lg">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Panduan Konfigurasi Mikrotik</h3>
+        
+        <div className="space-y-4 text-sm text-gray-600">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-medium text-blue-900 mb-2">🌐 Untuk IP Public/Hostname:</h4>
+            <ul className="list-disc list-inside space-y-1 text-blue-800">
+              <li>Gunakan port <strong>8729</strong> untuk HTTPS (disarankan)</li>
+              <li>Aktifkan SSL/TLS untuk keamanan</li>
+              <li>Pastikan port 8729 terbuka di firewall</li>
+              <li>Gunakan hostname atau IP public yang valid</li>
+            </ul>
+          </div>
+          
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <h4 className="font-medium text-green-900 mb-2">🏠 Untuk Jaringan Lokal:</h4>
+            <ul className="list-disc list-inside space-y-1 text-green-800">
+              <li>Gunakan port <strong>8728</strong> untuk HTTP</li>
+              <li>Gunakan IP private (192.168.x.x)</li>
+              <li>SSL tidak wajib untuk jaringan lokal</li>
+            </ul>
+          </div>
+          
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <h4 className="font-medium text-yellow-900 mb-2">⚙️ Enable REST API di Mikrotik:</h4>
+            <div className="bg-gray-900 text-gray-100 p-3 rounded font-mono text-xs mb-2">
+              /ip service set api address=0.0.0.0/0 port=8729 disabled=no
+            </div>
+            <p className="text-yellow-800">Atau via WinBox: IP → Services → API</p>
+          </div>
+          
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h4 className="font-medium text-red-900 mb-2">🔥 Firewall Settings:</h4>
+            <ul className="list-disc list-inside space-y-1 text-red-800">
+              <li>Allow input dari IP server aplikasi</li>
+              <li>Buka port API (8728/8729)</li>
+              <li>Rate limit untuk mencegah brute force</li>
+            </ul>
+          </div>
         </div>
       </div>
 
@@ -953,6 +1410,14 @@ export default function AdminDashboard() {
             <h1 className="text-lg font-bold text-gray-900 dark:text-white">MikroBill Pro</h1>
           </div>
           <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mr-2">
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                <User className="w-4 h-4 text-blue-600" />
+              </div>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {user?.name?.split(' ')[0] || 'Admin'}
+              </span>
+            </div>
             <ThemeToggleMobile />
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -974,6 +1439,33 @@ export default function AdminDashboard() {
               <ThemeToggle />
             </div>
             
+            {/* User Info */}
+            <div className="hidden lg:block mb-6 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <User className="w-5 h-5 text-blue-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {user?.name || 'Admin User'}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {user?.email || 'admin@mikrobill.pro'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={async () => {
+                  await logout()
+                  router.push('/admin/login')
+                }}
+                className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
+            </div>
+            
             <nav className="space-y-2">
               {menuItems.map((item) => (
                 <button
@@ -992,6 +1484,20 @@ export default function AdminDashboard() {
                   <span className="font-medium text-sm lg:text-base">{item.label}</span>
                 </button>
               ))}
+              
+              {/* Mobile Logout Button */}
+              <div className="lg:hidden pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={async () => {
+                    await logout()
+                    router.push('/admin/login')
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-3 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                >
+                  <LogOut className="w-5 h-5" />
+                  <span className="font-medium">Logout</span>
+                </button>
+              </div>
             </nav>
           </div>
         </div>
@@ -1004,6 +1510,7 @@ export default function AdminDashboard() {
               {activeTab === 'users' && 'User Management'}
               {activeTab === 'packages' && 'Package Management'}
               {activeTab === 'mikrotik' && 'Mikrotik Configuration'}
+              {activeTab === 'xendit' && 'Xendit Payment Settings'}
               {activeTab === 'transactions' && 'Transactions'}
               {activeTab === 'monitoring' && 'System Monitoring'}
               {activeTab === 'settings' && 'System Settings'}
@@ -1013,6 +1520,7 @@ export default function AdminDashboard() {
               {activeTab === 'users' && 'Manage your customers and their subscriptions'}
               {activeTab === 'packages' && 'Create and manage internet packages'}
               {activeTab === 'mikrotik' && 'Configure Mikrotik RouterOS integration'}
+              {activeTab === 'xendit' && 'Configure Xendit payment gateway settings'}
               {activeTab === 'transactions' && 'View payment history and transactions'}
               {activeTab === 'monitoring' && 'Real-time system monitoring and analytics'}
               {activeTab === 'settings' && 'System configuration and preferences'}
@@ -1023,8 +1531,9 @@ export default function AdminDashboard() {
           {activeTab === 'users' && renderUsers()}
           {activeTab === 'transactions' && renderTransactions()}
           {activeTab === 'mikrotik' && renderMikrotikConfig()}
+          {activeTab === 'xendit' && renderXenditConfig()}
           
-          {activeTab !== 'dashboard' && activeTab !== 'users' && activeTab !== 'transactions' && activeTab !== 'mikrotik' && (
+          {activeTab !== 'dashboard' && activeTab !== 'users' && activeTab !== 'transactions' && activeTab !== 'mikrotik' && activeTab !== 'xendit' && (
             <div className="bg-white p-12 rounded-xl shadow-lg text-center">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Settings className="w-8 h-8 text-gray-400" />

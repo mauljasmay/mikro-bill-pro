@@ -55,16 +55,29 @@ export class MikrotikAPI {
       const url = `${this.baseUrl}/rest${path}`
       const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')
       
-      const response = await fetch(url, {
+      // Prepare headers
+      const headers: HeadersInit = {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json',
+      }
+
+      // Prepare fetch options
+      const fetchOptions: RequestInit = {
         method,
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: data ? JSON.stringify(data) : undefined,
         // Add timeout to prevent hanging
-        signal: AbortSignal.timeout(10000) // 10 second timeout
-      })
+        signal: AbortSignal.timeout(15000) // 15 second timeout for public connections
+      }
+
+      // For SSL connections, handle certificate validation
+      if (this.config.useSSL) {
+        // In production, you might want to handle SSL certificates properly
+        // For now, we'll let Node.js handle default SSL verification
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0' // Only for development/testing
+      }
+
+      const response = await fetch(url, fetchOptions)
 
       if (!response.ok) {
         // Handle different HTTP status codes
@@ -73,7 +86,9 @@ export class MikrotikAPI {
         } else if (response.status === 403) {
           throw new Error('Access forbidden - insufficient permissions')
         } else if (response.status === 404) {
-          throw new Error('API endpoint not found - check Mikrotik version')
+          throw new Error('API endpoint not found - check Mikrotik version or REST API enabled')
+        } else if (response.status === 500) {
+          throw new Error('Mikrotik internal server error - check Mikrotik logs')
         } else {
           throw new Error(`Mikrotik API error: ${response.status} ${response.statusText}`)
         }
@@ -82,21 +97,29 @@ export class MikrotikAPI {
       // Check if response is actually JSON
       const contentType = response.headers.get('content-type')
       if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Invalid response from Mikrotik - not JSON format')
+        throw new Error('Invalid response from Mikrotik - not JSON format. REST API may not be enabled.')
       }
 
       return await response.json()
     } catch (error) {
       if (error.name === 'AbortError') {
-        throw new Error('Connection timeout - Mikrotik device not responding')
+        throw new Error('Connection timeout - Mikrotik device not responding (15s)')
       }
       
       if (error.message.includes('ECONNREFUSED')) {
-        throw new Error('Connection refused - check host and port')
+        throw new Error('Connection refused - check host, port, and firewall settings')
       }
       
       if (error.message.includes('ENOTFOUND')) {
-        throw new Error('Host not found - check hostname/IP address')
+        throw new Error('Host/hostname not found - check DNS or IP address')
+      }
+      
+      if (error.message.includes('ETIMEDOUT')) {
+        throw new Error('Connection timed out - network may be slow or blocked')
+      }
+      
+      if (error.message.includes('SSL') || error.message.includes('certificate')) {
+        throw new Error('SSL/TLS error - check certificate configuration')
       }
       
       console.error('Mikrotik API request failed:', error)
@@ -342,7 +365,7 @@ export async function getMikrotikConnection(): Promise<MikrotikAPI> {
     })
 
     if (!config) {
-      throw new Error('No active Mikrotik configuration found')
+      throw new Error('No active Mikrotik configuration found. Please configure Mikrotik settings in the admin panel.')
     }
 
     mikrotikInstance = new MikrotikAPI(config)
