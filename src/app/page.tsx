@@ -22,7 +22,7 @@ export default function Home() {
     company: '',
     message: ''
   })
-  const [formErrors, setFormErrors] = useState({})
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     const handleScroll = () => {
@@ -304,89 +304,11 @@ export default function Home() {
   }
 
   const handleSignUp = () => {
-    showNotification('Sign up feature coming soon!', 'info')
+    window.location.href = '/signup'
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full bg-white/90 dark:bg-gray-900/90 backdrop-blur-md shadow-sm z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 flex items-center gap-2">
-                <Router className="w-8 h-8 text-blue-600" />
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  MikroBill Pro
-                </h1>
-              </div>
-            </div>
-            
-            <div className="hidden md:block">
-              <div className="ml-10 flex items-baseline space-x-4">
-                {['home', 'packages', 'features', 'about', 'contact'].map((item) => (
-                  <button
-                    key={item}
-                    onClick={() => scrollToSection(item)}
-                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      activeSection === item
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    {item.charAt(0).toUpperCase() + item.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="hidden md:block">
-                <ThemeToggle />
-              </div>
-              <button 
-                onClick={handleLogin}
-                className="hidden md:block px-4 py-2 text-blue-600 hover:text-blue-700 font-medium transition-colors"
-              >
-                Login
-              </button>
-              <button 
-                onClick={handleSignUp}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Sign Up
-              </button>
-              <div className="md:hidden flex items-center gap-2">
-                <ThemeToggleMobile />
-                <button
-                  onClick={() => setIsMenuOpen(!isMenuOpen)}
-                  className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Mobile menu */}
-        {isMenuOpen && (
-          <div className="md:hidden bg-white dark:bg-gray-900 border-t dark:border-gray-700">
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              {['home', 'packages', 'features', 'about', 'contact'].map((item) => (
-                <button
-                  key={item}
-                  onClick={() => scrollToSection(item)}
-                  className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  {item.charAt(0).toUpperCase() + item.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </nav>
-
       {/* Hero Section */}
       <section id="home" className="pt-16 min-h-screen flex items-center relative">
         <div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-5 dark:opacity-10" 

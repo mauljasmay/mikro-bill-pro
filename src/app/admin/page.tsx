@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
+import { useSession, signOut } from 'next-auth/react'
+import {
   Router, Settings, Users, Package, CreditCard, Activity, BarChart3,
   Plus, Edit, Trash2, Eye, Power, PowerOff, RefreshCw, CheckCircle, XCircle,
   Server, Wifi, Globe, Shield, AlertCircle, TrendingUp, Download, Upload,
@@ -14,18 +15,43 @@ import LoadingFallback, { SkeletonCard, SkeletonTable } from '@/components/Loadi
 import NetworkErrorFallback, { ApiErrorFallback } from '@/components/NetworkErrorFallback'
 import { ThemeToggle, ThemeToggleMobile } from '@/components/ThemeToggle'
 
+interface User {
+  id: string;
+  name?: string;
+  email?: string;
+  username?: string;
+  status?: string;
+  package?: string;
+  speed?: string;
+  createdAt?: string;
+}
+
+interface Transaction {
+  id: string;
+  customerName?: string;
+  customerEmail?: string;
+  packageName?: string;
+  amount: number | string;
+  status?: string;
+  createdAt?: string;
+}
+
+interface Package {
+  id: string;
+  name: string;
+  description?: string;
+  type: string;
+  price: number | string;
+  duration: number;
+  speedLimit?: string;
+  isActive: boolean;
+}
+
 export default function AdminDashboard() {
   const router = useRouter()
-  // Authentication disabled - direct access to dashboard
-  const [user] = useState({ 
-    id: 'admin', 
-    email: 'admin@mikrobill.pro', 
-    name: 'Administrator', 
-    role: 'ADMIN' 
-  })
-  const logout = () => {
-    // Logout disabled - no action needed
-  }
+  const { data: session, status } = useSession()
+
+  // All hooks must be called at the top level, before any conditional logic
   const [activeTab, setActiveTab] = useState('dashboard')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [mikrotikConfig, setMikrotikConfig] = useState({
@@ -62,7 +88,7 @@ export default function AdminDashboard() {
   })
   const [fetchErrors, setFetchErrors] = useState<{ [key: string]: Error | null }>({})
   const { handleError } = useErrorHandler()
-  
+
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -71,6 +97,30 @@ export default function AdminDashboard() {
     newUsersToday: 0,
     revenueThisMonth: 0
   })
+
+  const [monitoringData, setMonitoringData] = useState({
+    systemHealth: {},
+    databaseStatus: {},
+    apiPerformance: {},
+    networkTraffic: {},
+    recentLogs: [],
+    alerts: []
+  })
+
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  useEffect(() => {
+    if (status === 'loading') return
+
+    if (session && session.user && (session.user as any).role === 'ADMIN') {
+      setIsAuthenticated(true)
+    } else {
+      router.push('/admin/login')
+    }
+  }, [session, status, router])
+
+  // Define user from session for use in component
+  const user = session?.user
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="w-5 h-5" /> },
@@ -96,7 +146,8 @@ export default function AdminDashboard() {
           fetchPackages(),
           fetchMikrotikUsers(),
           fetchXenditConfig(),
-          fetchMikrotikConfig()
+          fetchMikrotikConfig(),
+          fetchMonitoringData()
         ])
       } catch (error) {
         console.error('Failed to load initial data:', error)
@@ -133,10 +184,10 @@ export default function AdminDashboard() {
       } else {
         throw new Error(`Failed to fetch dashboard data: ${response.status}`)
       }
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error('Unknown error')
-      setFetchErrors(prev => ({ ...prev, dashboard: err }))
-      console.error('Failed to fetch dashboard data:', err)
+    } catch (error: unknown) {
+      const errorObj = error instanceof Error ? error : new Error(String(error))
+      setFetchErrors(prev => ({ ...prev, dashboard: errorObj }))
+      console.error('Failed to fetch dashboard data:', errorObj)
     }
   }
 
@@ -192,19 +243,35 @@ export default function AdminDashboard() {
   }
 
   const fetchMikrotikUsers = async () => {
+    let currentError: Error | null = null
     try {
       const response = await fetch('/api/mikrotik/users')
-      if (response.ok) {
-        const data = await response.json()
-        setMikrotikUsers(data.users || [])
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setMikrotikUsers(data.data || [])
         setFetchErrors(prev => ({ ...prev, mikrotik: null }))
       } else {
-        throw new Error(`Failed to fetch Mikrotik users: ${response.status}`)
+        // Handle specific error codes
+        let errorMessage = data.message || `Failed to fetch Mikrotik users: ${response.status}`
+
+        if (data.code === 'MIKROTIK_NOT_CONFIGURED') {
+          errorMessage = 'Mikrotik is not configured. Please set up Mikrotik connection in the Mikrotik tab.'
+        } else if (data.code === 'MIKROTIK_CONNECTION_FAILED') {
+          errorMessage = 'Cannot connect to Mikrotik device. Please check your configuration and network.'
+        } else if (data.code === 'MIKROTIK_AUTH_FAILED') {
+          errorMessage = 'Mikrotik authentication failed. Please check your credentials.'
+        }
+
+        currentError = new Error(errorMessage)
+        (currentError as any).code = data.code
+        setFetchErrors(prev => ({ ...prev, mikrotik: currentError }))
+        console.error('Failed to fetch Mikrotik users:', currentError)
       }
     } catch (error) {
-      const err = error instanceof Error ? error : new Error('Unknown error')
-      setFetchErrors(prev => ({ ...prev, mikrotik: err }))
-      console.error('Failed to fetch Mikrotik users:', err)
+      currentError = error instanceof Error ? error : new Error('Unknown error')
+      setFetchErrors(prev => ({ ...prev, mikrotik: currentError }))
+      console.error('Failed to fetch Mikrotik users:', currentError)
     }
   }
 
@@ -249,7 +316,7 @@ export default function AdminDashboard() {
           const activeConfig = data.configs.find(config => config.isActive) || data.configs[0]
           setMikrotikConfig({
             host: activeConfig.host || '',
-            port: parseInt(activeConfig.port) || 8728,
+            port: parseInt(activeConfig.port) || 8729,
             username: activeConfig.username || '',
             password: activeConfig.password || '',
             useSSL: activeConfig.useSSL || false
@@ -263,6 +330,30 @@ export default function AdminDashboard() {
       const err = error instanceof Error ? error : new Error('Unknown error')
       setFetchErrors(prev => ({ ...prev, mikrotikConfig: err }))
       console.error('Failed to fetch Mikrotik config:', err)
+    }
+  }
+
+  const fetchMonitoringData = async () => {
+    try {
+      const response = await fetch('/api/admin/monitoring')
+      if (response.ok) {
+        const data = await response.json()
+        setMonitoringData({
+          systemHealth: data.systemHealth || {},
+          databaseStatus: data.databaseStatus || {},
+          apiPerformance: data.apiPerformance || {},
+          networkTraffic: data.networkTraffic || {},
+          recentLogs: data.recentLogs || [],
+          alerts: data.alerts || []
+        })
+        setFetchErrors(prev => ({ ...prev, monitoring: null }))
+      } else {
+        throw new Error(`Failed to fetch monitoring data: ${response.status}`)
+      }
+    } catch (error) {
+      const errorObj = error instanceof Error ? error : new Error(String(error))
+      setFetchErrors(prev => ({ ...prev, monitoring: errorObj }))
+      console.error('Failed to fetch monitoring data:', errorObj)
     }
   }
 
@@ -287,7 +378,7 @@ export default function AdminDashboard() {
           useSSL: mikrotikConfig.useSSL || false
         })
       })
-      
+
       const data = await response.json()
       if (data.success) {
         showNotification('Mikrotik configuration saved successfully!', 'success')
@@ -744,7 +835,7 @@ export default function AdminDashboard() {
                     </td>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        transaction.status === 'completed' 
+                        transaction.status === 'completed'
                           ? 'bg-green-100 text-green-800'
                           : transaction.status === 'pending'
                           ? 'bg-yellow-100 text-yellow-800'
@@ -774,6 +865,162 @@ export default function AdminDashboard() {
       </div>
     </div>
   )
+
+  const renderPackages = () => {
+    if (isInitialLoading) {
+      return <SkeletonTable rows={5} />
+    }
+
+    if (fetchErrors.packages) {
+      return (
+        <ApiErrorFallback
+          error={fetchErrors.packages}
+          onRetry={fetchPackages}
+          action="load packages"
+        />
+      )
+    }
+
+    return (
+      <div className="space-y-6">
+        {/* Search and Filter Controls */}
+        <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg">
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+            <div className="flex flex-col sm:flex-row gap-4 flex-1">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search packages..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value)
+                    setCurrentPage(1)
+                  }}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <select
+                value={filterStatus}
+                onChange={(e) => {
+                  setFilterStatus(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Types</option>
+                <option value="PPPOE">PPPoE</option>
+                <option value="HOTSPOT">Hotspot</option>
+                <option value="BOTH">Both</option>
+              </select>
+            </div>
+            <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Add Package
+            </button>
+          </div>
+        </div>
+
+        {/* Packages Table */}
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Package
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Price
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Duration
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Speed Limit
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {packages.length > 0 ? (
+                  packages.map((pkg) => (
+                    <tr key={pkg.id} className="hover:bg-gray-50">
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{pkg.name}</div>
+                          <div className="text-sm text-gray-500">{pkg.description || 'No description'}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          pkg.type === 'PPPOE'
+                            ? 'bg-blue-100 text-blue-800'
+                            : pkg.type === 'HOTSPOT'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-purple-100 text-purple-800'
+                        }`}>
+                          {pkg.type}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        Rp {(Number(pkg.price) || 0).toLocaleString('id-ID')}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {pkg.duration} days
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {pkg.speedLimit || 'Unlimited'}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          pkg.isActive
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {pkg.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center gap-2">
+                          <button className="text-blue-600 hover:text-blue-900">
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button className="text-yellow-600 hover:text-yellow-900">
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button className="text-red-600 hover:text-red-900">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" className="px-6 py-12 text-center">
+                      <div className="text-gray-500">
+                        <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                        <p>No packages found</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const renderXenditConfig = () => (
     <div className="space-y-6">
@@ -1456,7 +1703,7 @@ export default function AdminDashboard() {
               </div>
               <button
                 onClick={async () => {
-                  await logout()
+                  await signOut()
                   router.push('/admin/login')
                 }}
                 className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
@@ -1489,7 +1736,7 @@ export default function AdminDashboard() {
               <div className="lg:hidden pt-4 border-t border-gray-200 dark:border-gray-700">
                 <button
                   onClick={async () => {
-                    await logout()
+                    await signOut()
                     router.push('/admin/login')
                   }}
                   className="w-full flex items-center gap-3 px-3 py-3 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"

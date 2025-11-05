@@ -15,7 +15,8 @@ datasource db {
 
 model User {
   id              String   @id @default(cuid())
-  email           String   @unique
+  username        String   @unique
+  email           String?
   name            String
   phone           String?
   password        String
@@ -25,12 +26,12 @@ model User {
   balance         Float    @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  
+
   // Relations
   subscriptions   Subscription[]
   transactions    Transaction[]
   sessions        InternetSession[]
-  
+
   @@map("users")
 }
 
@@ -123,7 +124,7 @@ model MikrotikConfig {
   id              String   @id @default(cuid())
   name            String   @unique
   host            String
-  port            Int      @default(8728)
+  port            Int      @default(8729)
   username        String
   password        String
   useSSL          Boolean  @default(false)
@@ -131,7 +132,7 @@ model MikrotikConfig {
   lastSync        DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  
+
   @@map("mikrotik_configs")
 }
 

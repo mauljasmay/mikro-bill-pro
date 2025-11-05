@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
         where: { id: existingConfig.id },
         data: {
           host,
-          port: parseInt(port) || 8728,
+          port: parseInt(port) || 8729,
           username,
           password,
           useSSL: useSSL || false,
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
         data: {
           name,
           host,
-          port: parseInt(port) || 8728,
+          port: parseInt(port) || 8729,
           username,
           password,
           useSSL: useSSL || false,
