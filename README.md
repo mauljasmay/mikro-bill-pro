@@ -28,6 +28,136 @@ Complete PPPoE and Hotspot billing solution with Mikrotik RouterOS integration, 
 - **Payment**: Xendit Payment Gateway
 - **Infrastructure**: Mikrotik RouterOS API
 
+## 🐧 Local Ubuntu 22 Server Installation Guide
+
+### Prerequisites
+- Ubuntu 22.04 LTS Server/Desktop
+- Minimum 2GB RAM, 10GB Storage
+- Internet connection
+- sudo/administrator access
+
+---
+
+### Step 1: System Update & Basic Dependencies
+
+```bash
+# Update system packages
+sudo apt update && sudo apt upgrade -y
+
+# Install essential build tools
+sudo apt install -y build-essential curl wget git unzip
+
+# Install Node.js 18.x (Recommended)
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# Verify Node.js installation
+node --version  # Should show v18.x.x
+npm --version   # Should show 9.x.x
+```
+
+---
+
+### Step 2: Install Database (SQLite)
+
+```bash
+# Install SQLite3 and development tools
+sudo apt install -y sqlite3 libsqlite3-dev
+
+# Verify SQLite installation
+sqlite3 --version
+```
+
+---
+
+### Step 3: Clone and Setup MikroBill Pro
+
+```bash
+# Clone the repository
+git clone https://github.com/mauljasmay/mikro-bill-pro.git
+
+cd mikro-bill-pro
+
+# Install Node.js dependencies
+npm install
+
+# Setup environment variables
+cp .env.example .env.local
+nano .env.local  # Edit with your configuration
+```
+
+---
+
+### Step 4: Configure Environment Variables
+
+Edit `.env.local` with your actual configuration:
+
+```env
+# Database
+DATABASE_URL="file:./dev.db"
+
+# NextAuth.js Configuration
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="your-very-secure-secret-key-here-min-32-chars"
+
+# Xendit Payment Gateway (for development)
+XENDIT_SECRET_KEY="xnd_development_your-secret-key-here"
+XENDIT_API_KEY="xnd_development_your-api-key-here"
+XENDIT_WEBHOOK_TOKEN="your-webhook-token-here"
+
+# Mikrotik RouterOS Configuration (optional for local dev)
+MIKROTIK_HOST="192.168.88.1"
+MIKROTIK_USERNAME="admin"
+MIKROTIK_PASSWORD="your-mikrotik-password"
+MIKROTIK_PORT="8728"
+MIKROTIK_USE_SSL="false"
+
+# Application Settings
+APP_NAME="MikroBill Pro"
+APP_URL="http://localhost:3000"
+ADMIN_EMAIL="admin@localhost"
+
+# Production
+NODE_ENV="development"
+```
+
+---
+
+### Step 5: Setup Database
+
+```bash
+# Generate Prisma client
+npx prisma generate
+
+# Push database schema
+npx prisma db push
+
+# (Optional) Seed database with sample data
+npx prisma db seed
+```
+
+---
+
+### Step 6: Create Default Packages
+
+```bash
+# Create default internet packages
+curl -X POST http://localhost:3000/api/setup/packages
+```
+
+---
+
+### Step 7: Run the Application
+
+```bash
+# Start development server
+npm run dev
+```
+
+Access the application at `http://localhost:3000`
+
+---
+
 ## 🐧 Ubuntu 22.04 Installation Guide
 
 ### Prerequisites
