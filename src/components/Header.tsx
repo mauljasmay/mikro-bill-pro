@@ -12,11 +12,6 @@ export default function Header() {
   const router = useRouter()
   const pathname = usePathname()
 
-  // Don't show header on admin routes
-  if (pathname?.startsWith('/admin')) {
-    return null
-  }
-
   useEffect(() => {
     const handleScroll = () => {
       const sections = ['home', 'packages', 'features', 'about', 'contact']
@@ -39,6 +34,11 @@ export default function Header() {
       return () => window.removeEventListener('scroll', handleScroll)
     }
   }, [pathname])
+
+  // Don't show header on admin routes
+  if (pathname?.startsWith('/admin')) {
+    return null
+  }
 
   const scrollToSection = (sectionId: string) => {
     if (pathname !== '/') {

@@ -1,4 +1,5 @@
 import { MikrotikConfig } from '@prisma/client'
+import { db } from './db'
 
 export interface MikrotikUser {
   '.id': string
@@ -357,15 +358,13 @@ let mikrotikInstance: MikrotikAPI | null = null
 
 export async function getMikrotikConnection(): Promise<MikrotikAPI> {
   if (!mikrotikInstance) {
-    const { db } = await import('./db')
-    
     // Get active Mikrotik config
     const config = await db.mikrotikConfig.findFirst({
       where: { isActive: true }
     })
 
     if (!config) {
-      throw new Error('No active Mikrotik configuration found. Please configure Mikrotik settings in the admin panel.')
+      throw new Error('No active Mikrotik configuration found. Please run the initialization script or configure Mikrotik settings in the admin panel at /admin.')
     }
 
     mikrotikInstance = new MikrotikAPI(config)

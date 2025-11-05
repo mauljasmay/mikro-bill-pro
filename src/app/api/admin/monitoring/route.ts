@@ -1,3 +1,5 @@
+
+
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getMikrotikConnection } from '@/lib/mikrotik'
@@ -95,7 +97,7 @@ async function getSystemHealth() {
       database: 'error',
       mikrotik: 'error',
       server: 'error',
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
 }
@@ -123,7 +125,7 @@ async function getDatabaseStatus() {
   } catch (error) {
     return {
       status: 'error',
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
 }
@@ -149,7 +151,7 @@ async function getApiPerformance() {
   } catch (error) {
     return {
       status: 'error',
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
 }
@@ -175,7 +177,7 @@ async function getNetworkTraffic() {
   } catch (error) {
     return {
       status: 'error',
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
 }
@@ -223,9 +225,10 @@ async function getAlerts() {
       const mikrotik = await getMikrotikConnection()
       await mikrotik.testConnection()
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Mikrotik connection failed'
       alerts.push({
         type: 'error',
-        message: 'Mikrotik connection failed',
+        message: errorMessage,
         timestamp: new Date().toISOString()
       })
     }
@@ -273,7 +276,7 @@ async function getDetailedSystemInfo() {
       uptime: systemInfo['uptime'] || 'N/A'
     }
   } catch (error) {
-    return { error: error.message }
+    return { error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 
@@ -299,7 +302,7 @@ async function getDetailedNetworkInfo() {
       }
     }
   } catch (error) {
-    return { error: error.message }
+    return { error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 
@@ -347,7 +350,7 @@ async function getDetailedPerformanceInfo() {
       avgTransactionsPerHour: totalTransactions / 24
     }
   } catch (error) {
-    return { error: error.message }
+    return { error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 
