@@ -51,7 +51,7 @@ sudo apt install -y build-essential curl wget git unzip software-properties-comm
     apt-transport-https ca-certificates gnupg lsb-release
 
 # Install Node.js 18.x (Recommended)
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt install -y nodejs
 
 # Verify Node.js installation
